@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MYXIA</title>
+
+<style>
+    body {
+        margin: 0;
+        background: #0d0d0d;
+        color: #fff;
+        font-family: Arial;
+        text-align: center;
+    }
+
+    h1 {
+        font-size: 22px;
+        margin: 15px 0;
+    }
+
+    .container {
+        width: 95%;
+        margin: auto;
+        padding-bottom: 30px;
+    }
+
+    button {
+        width: 160px;
+        height: 55px;
+        margin: 8px;
+        font-size: 18px;
+        border: none;
+        border-radius: 12px;
+        background: #1e1e1e;
+        color: #00eaff;
+        font-weight: bold;
+        box-shadow: 0 0 10px #00eaff50;
+        transition: 0.2s;
+    }
+
+    button:active {
+        transform: scale(0.92);
+        background: #00eaff;
+        color: #000;
+        box-shadow: 0 0 20px #00eaff;
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        width: 100%;
+        margin-top: 20px;
+    }
+
+    .grid button {
+        width: 100%;
+        height: 70px;
+    }
+
+    .slider {
+        width: 90%;
+        margin-top: 10px;
+    }
+
+    #console {
+        background: #111;
+        border: 1px solid #00eaff50;
+        height: 90px;
+        overflow-y: auto;
+        padding: 8px;
+        margin-top: 15px;
+        border-radius: 8px;
+        text-align: left;
+        font-size: 13px;
+    }
+
+    textarea {
+        width: 90%;
+        height: 70px;
+        background: #111;
+        border: 1px solid #00eaff60;
+        color: #fff;
+        border-radius: 8px;
+        padding: 8px;
+        margin-top: 8px;
+        resize: none;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>🤖 MYXIA</h1>
+
+<div class="container">
+
+<button onclick="autoconectar()">🔌 Conectar</button>
+
+<h2>Movimiento</h2>
+
+<div class="grid">
+    <div></div>
+    <button onclick="cmd('forward')">▲</button>
+    <div></div>
+
+    <button onclick="cmd('left')">◀</button>
+    <button onclick="stopBot()">■</button>
+    <button onclick="cmd('right')">▶</button>
+
+    <div></div>
+    <button onclick="cmd('backward')">▼</button>
+    <div></div>
+</div>
+
+<h3>Velocidad</h3>
+<input id="speed" class="slider" type="range" min="0" max="255" value="180">
+
+<h2>Servo Cabeza</h2>
+<input id="servoSlider" class="slider" type="range" min="0" max="180" value="90" oninput="setServo(this.value)">
+
+<h2>Distancia</h2>
+<div id="dist">-- cm</div>
+<button onclick="leerDist()">Leer Distancia</button>
+
+<h2>Asistente</h2>
+<textarea id="inputIA" placeholder="Pregúntame algo..."></textarea><br>
+<button onclick="enviarIA()">Enviar</button>
+
+<h3>Consola</h3>
+<div id="console">Listo...</div>
+
+</div>
+
+<script>
+let base = "";
+let conectado = false;
+
+function log(msg){
+    const c = document.getElementById('console');
+    c.innerHTML += "<br>• " + msg;
+    c.scrollTop = c.scrollHeight;
+}
+
+async function autoconectar(){
+    log("Buscando ESP32...");
+    const ips = ["http://192.168.4.1", "/", "http://esp32.local"];
+
+    for (let ip of ips) {
+        try {
+            const r = await fetch(ip + "/ping");
+            if (r.ok) {
+                base = ip;
+                conectado = true;
+                log("Conectado a ESP32 ✔");
+                return;
+            }
+        } catch(e){}
+    }
+    log("❌ No se encontró el ESP32");
+}
+
+function cmd(dir){
+    if(!conectado) return log("Error: no conectado.");
+    let speed = document.getElementById("speed").value;
+    fetch(`${base}/cmd?action=${dir}&speed=${speed}`);
+    log("Movimiento: " + dir);
+}
+
+function stopBot(){
+    if(!conectado) return log("Error: no conectado.");
+    fetch(`${base}/stop`);
+    log("STOP");
+}
+
+function setServo(v){
+    if(!conectado) return;
+    fetch(`${base}/servo?angle=${v}`);
+    log("Servo: " + v);
+}
+
+async function leerDist(){
+    if(!conectado) return log("Error: no conectado.");
+    try {
+        let r = await fetch(`${base}/dist`);
+        let t = await r.text();
+        document.getElementById("dist").innerText = t + " cm";
+        log("Distancia: " + t + " cm");
+    } catch(e){
+        log("Error al leer distancia");
+    }
+}
+
+async function enviarIA(){
+    let t = document.getElementById("inputIA").value;
+    if(!t) return;
+
+    log("Tú: " + t);
+
+    try {
+        let r = await fetch(`${base}/chat?msg=${encodeURIComponent(t)}`);
+        let ans = await r.text();
+        log("IA: " + ans);
+
+        let u = new SpeechSynthesisUtterance(ans);
+        speechSynthesis.speak(u);
+
+    } catch(e){
+        log("Error IA");
+    }
+}
+</script>
+
+</body>
+</html>
